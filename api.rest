@@ -1,0 +1,37 @@
+
+POST http://localhost:3000/user
+Content-Type: application/json
+
+{
+    "username": "demow3",
+    "password": "demo3"
+}
+
+
+GET http://localhost:3000/users
+
+
+GET http://localhost:3000/user
+Content-Type: application/json
+
+{
+    "id": 1
+}
+
+
+PUT http://localhost:3000/user
+Content-Type: application/json
+
+{
+    "id": 1,
+    "username": "updatedUser",
+    "password": "newpassword123"
+}
+
+
+DELETE http://localhost:3000/user
+Content-Type: application/json
+
+{
+    "id": 1
+}
