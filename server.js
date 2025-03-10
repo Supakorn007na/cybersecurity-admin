@@ -1,108 +1,116 @@
 const express = require('express');
-const { PrismaClient } = require('@prisma/client');
+const {PrismaClient} = require("@prisma/client");
+const bodyParser = require("body-parser")
+const crypto = require("crypto-js");
+const env = require("dotenv");
 
-const prisma = new PrismaClient();
-const app = express();
+env.config();
+function encodeData(data){
+    const password = crypto.AES.encrypt(data, process.env.SECRET_KEY);
+    return password.toString();
+}
 
-app.use(express.json()); 
+function decodeData(data){
+    const password = crypto.AES.decrypt(data, process.env.SECRET_KEY);
+    return password.toString(crypto.enc.Utf8);
+}
 
+const app = express()
+app.use(bodyParser.json())
+const prisma =  new PrismaClient();
+const port = 3000
 
-app.post('/user', async (req, res) => {
-    try {
-        const { username, password } = req.body;
-        
-        if (!username || !password) {
-            return res.status(400).json({ message: "Username and password are required" });
-        }
+app.get('/', (req, res) => {
+  res.send('Hello World!')
+})
 
-        const user = await prisma.user.create({
-            data: { username, password }
-        });
-
-        res.json({ message: "User added successfully", user });
-
-    } catch (error) {
-        res.status(500).json({ message: "Internal Server Error", error: error.message });
-    }
+app.get('/user', async (req,res) =>{
+    const data = await prisma.$queryRaw `select id, username, cardid from user`;
+    const finalData = data.map(record => ({
+        ...record,
+        cardId: decodeData(record.cardId)
+    }));
+    console.log(finalData);
+    res.json({
+        message: 'okay',
+        data: finalData
+    })
+    // const data = await prisma.user.findMany();
+    //const data = await prisma.$queryRaw `select id, username, cardid from user`;
+    //const finalDAta = await data.map(record =>{
+        //console.log('record', record)
+        //dalete record.password;
+        //return record;
+    //});
+    //res.json({
+        //message: 'okay',
+        //data: finalDAta
+        //data
+    //})
 });
 
-
-app.get('/users', async (req, res) => {
-    try {
-        const users = await prisma.user.findMany();
-        res.json(users);
-    } catch (error) {
-        res.status(500).json({ message: "Internal Server Error", error: error.message });
+app.post('/user', async (req, res) =>{
+    console.log(req.body)
+    const response = await prisma.user.create({
+        data: {
+            username: req.body.username,
+            password: encodeData(req.body.password),
+            cardId: encodeData(req.body.cardId)
+        }
+    });
+    if(response){
+        res.json({
+            message: "add successfully"
+        })
+    }else{
+        res.json({
+            message: "failed"
+        })
     }
 });
-
-
-app.get('/user', async (req, res) => {
-    try {
-        const { id } = req.body;
-
-        if (!id) {
-            return res.status(400).json({ message: "User ID is required in request body" });
-        }
-
-        const user = await prisma.user.findUnique({
-            where: { id: Number(id) }
-        });
-
-        if (!user) {
-            return res.status(404).json({ message: "User not found" });
-        }
-
-        res.json(user);
-
-    } catch (error) {
-        res.status(500).json({ message: "Internal Server Error", error: error.message });
-    }
-});
-
 
 app.put('/user', async (req, res) => {
-    try {
-        const { id, username, password } = req.body;
-
-        if (!id || !username || !password) {
-            return res.status(400).json({ message: "ID, username, and password are required in request body" });
+    const response = await prisma.user.update({
+        select: {
+            password: true,
+            id: true
+        },
+        where: {
+            id: req.body.id
+        },
+        data: {
+            password: encodeData(req.body.password)
         }
-
-        const user = await prisma.user.update({
-            where: { id: Number(id) },
-            data: { username, password }
-        });
-
-        res.json({ message: "User updated successfully", user });
-
-    } catch (error) {
-        res.status(500).json({ message: "Internal Server Error", error: error.message });
-    }
+    });
+    if (response) { 
+        res.json({
+            message: "update sucessfully"
+        })
+    } else { 
+        res.json({
+            message: "update fail"
+    })}
 });
-
 
 app.delete('/user', async (req, res) => {
-    try {
-        const { id } = req.body;
-
-        if (!id) {
-            return res.status(400).json({ message: "User ID is required in request body" });
+    const response = await prisma.user.delete({
+        where: {
+            id: req.body.id
+        },
+        select:{
+            username: true
         }
-
-        await prisma.user.delete({
-            where: { id: Number(id) }
-        });
-
-        res.json({ message: "User deleted successfully" });
-
-    } catch (error) {
-        res.status(500).json({ message: "Internal Server Error", error: error.message });
-    }
+       });
+       if (response) { 
+        res.json({
+            message: "delete sucessfully"
+             })
+        } else { 
+            res.json({
+                message: "delete fail"
+    })}
 });
 
-
-const PORT = 3000;
-app.listen(PORT, () => {
-    console.log(`Server is running on http://localhost:${PORT}`);
-});
+app.listen(port, () => {
+  console.log(`server is running on port ${port}`)
+})
